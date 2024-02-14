@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import time
 import tkinter as tk  # 导入tkinter模块。为了方便后续讲解，命名为 tk。
 import tkinter.messagebox  # 引入弹窗库，防止解释器弹出报错。
-tk.messagebox.showinfo(title='自动网络连接连接程序',message='已启动程序，自动连接МГДУ校园网，程序后台运行，如需关闭程序请启动任务管理器。本窗口可直接关闭。')  # 消息提醒弹窗，点击确定返回值为 ok
+tk.messagebox.showinfo(title='自动网络连接连接程序',message='已启动程序，自动连接МГТУ校园网，程序后台运行，如需关闭程序请启动任务管理器。本窗口可直接关闭。')  # 消息提醒弹窗，点击确定返回值为 ok
 
 def job():
     header = {
