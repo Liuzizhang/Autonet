@@ -4,9 +4,14 @@ from bs4 import BeautifulSoup
 import time
 import tkinter as tk  # 导入tkinter模块。为了方便后续讲解，命名为 tk。
 import tkinter.messagebox  # 引入弹窗库，防止解释器弹出报错。
+import re
+import schedule
+import urllib3
+from datetime import datetime
+import os
 
 tk.messagebox.showinfo(title='自动网络连接连接程序',message='已启动程序，自动连接МГТУ校园网，程序后台运行，如需关闭程序请启动任务管理器。本窗口可直接关闭。')  # 消息提醒弹窗，点击确定返回值为 ok
-
+seconds=2*60*60
 headers_list = [
     {
         'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1'
@@ -85,9 +90,64 @@ headers_list = [
     }
 ]
 
+def time_to_seconds(time_str):
+    # 使用正则表达式匹配小时、分钟和秒
+    match = re.match(r'(\d+)h(\d+)m(\d+)s', time_str)
+    if match:
+        # 如果匹配成功，提取小时、分钟和秒
+        hours, minutes, seconds = match.groups()
+        
+        # 将字符串转换为整数
+        hours = int(hours)
+        minutes = int(minutes)
+        seconds = int(seconds) if seconds else 0  # 如果没有秒，设置为0
+        
+        # 计算总秒数
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        return total_seconds
+    # 使用正则表达式匹配小时和秒
+    match = re.match(r'(\d+)h(\d+)s', time_str)
+    if match:
+        # 如果匹配成功，提取小时和秒
+        hours,  seconds = match.groups()
+        
+        # 将字符串转换为整数
+        hours = int(hours)
+        seconds = int(seconds) if seconds else 0  # 如果没有秒，设置为0
+        
+        # 计算总秒数
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        return total_seconds
+    else:
+        # 如果没有匹配小时，尝试匹配只有分钟和秒的情况
+        match = re.match(r'(\d+)m(\d+)s?', time_str)
+        
+        if match:
+            minutes, seconds = match.groups()
+            minutes = int(minutes)
+            seconds = int(seconds) if seconds else 0  # 如果没有秒，设置为0
+            return minutes * 60 + seconds
+        
+        # 如果没有匹配小时，尝试匹配只有分钟的情况
+        match = re.match(r'(\d+)m?', time_str)
+        
+        if match:
+            minutes = match.group(1)
+            minutes = int(minutes)
+            return minutes * 60
+        
+        # 如果没有匹配分钟，尝试匹配只有秒的情况
+        match = re.match(r'(\d+)s', time_str)
+        
+        if match:
+            seconds = match.group(1)
+            return int(seconds)
+        
+        # 如果没有匹配，返回None或者抛出异常
+        return 0
 
 
-def job():
+def postreq():
     header = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br",
@@ -103,21 +163,49 @@ def job():
             "username":"mop",
             "password":"18301919"
         }
-    r1 = requests.post("https://internet.msfu.ru/login", data=post_dict, headers=header)
-
-while True:
-    headers = random.choice(headers_list)
-    req = requests.get(url="https://internet.msfu.ru/status", headers=headers)
-    html = req.text
+    req_out = requests.get(url="https://internet.msfu.ru/logout")
+    print("logout and req")
+    r1 = requests.post("https://internet.msfu.ru/login", data=post_dict, headers=header, timeout=30)
+def settime():
+    try:
+        headers = random.choice(headers_list)
+        req = requests.get(url="https://internet.msfu.ru/status", headers=headers)
+        html = req.text
+    except urllib3.exceptions.MaxRetryError as e:
+        # 如果请求因为重试次数过多而失败，捕获这个异常
+        print(f"MaxRetryError: {e}")
+        retry()
+    except requests.exceptions.SSLError as e:
+        # 如果请求因为SSL错误而失败，捕获这个异常
+        print(f"SSLError: {e}")
+        retry()
+    except requests.exceptions.RequestException as e:
+        # 捕获其他可能的请求异常
+        print(f"RequestException: {e}")
+        retry()
     soup = BeautifulSoup(req.text,features="html.parser")
     htmltitle = soup.find("title").text.strip()
     if htmltitle=="internet hotspot > login":
-        job()
-
+        postreq()
     if htmltitle=="mikrotik hotspot > status":
         company_items = soup.find_all("td")
         gettime=company_items[5].text.strip()
-        lefttime=gettime.split("/")[1]
-        if 'h' not in lefttime and 'm' not in lefttime:
-            req_out = requests.get(url="https://internet.msfu.ru/logout")
-            job()
+        lefttime=gettime.split("/")[1].replace(" ", "")
+        seconds = time_to_seconds(lefttime)
+        print(seconds)
+        if seconds<600:
+            postreq()
+            return seconds
+def retry():
+    # 获取当前时间
+    current_time = datetime.now()
+
+    # 打印当前时间
+    print("ERROR时间是:", current_time)
+settime()
+asktime=random.randint(1, 10)
+schedule.every(asktime*60).seconds.do(settime)
+schedule.every(seconds).seconds.do(postreq)
+while True:
+    schedule.run_pending()
+    time.sleep(1)
